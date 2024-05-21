@@ -1,0 +1,44 @@
+$primary: #ffeded;
+$gold: #d4cc44;
+$secondary: $gold;
+
+@import "../../node_modules/bootstrap/scss/bootstrap";
+
+.singleLineTextInput {
+  border: none;
+  outline: none;
+}
+
+/* Changes background color when input is auto-filled */
+.singleLineTextInput:-webkit-autofill,
+.singleLineTextInput:-webkit-autofill:active,
+.singleLineTextInput:-webkit-autofill:hover,
+.singleLineTextInput:-webkit-autofill:focus {
+  transition: background-color 10000s;
+  -webkit-text-fill-color: black !important;
+}
+
+#phone-inputs-wrapper {
+  display: flex;
+}
+
+.phone-inputs span {
+  display: flex;
+  text-align: center;
+  width: 33.33%;
+  align-items: center;
+}
+
+.phone-inputs input {
+  width: 4rem;
+  flex-grow: 1;
+  text-align: center;
+  margin: 0;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+}
+
+.phone-inputs div {
+  flex-grow: 1;
+}
