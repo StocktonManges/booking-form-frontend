@@ -1,6 +1,5 @@
 $primary: #ffeded;
 $gold: #d4cc44;
-$secondary: $gold;
 
 @import "../../node_modules/bootstrap/scss/bootstrap";
 
@@ -20,6 +19,7 @@ $secondary: $gold;
 
 #phone-inputs-wrapper {
   display: flex;
+  max-width: 250px;
 }
 
 .phone-inputs span {
@@ -27,6 +27,7 @@ $secondary: $gold;
   text-align: center;
   width: 33.33%;
   align-items: center;
+  height: 34.2px;
 }
 
 .phone-inputs input {
@@ -41,4 +42,8 @@ $secondary: $gold;
 
 .phone-inputs div {
   flex-grow: 1;
+}
+
+#react-calendar {
+  width: 100%;
 }

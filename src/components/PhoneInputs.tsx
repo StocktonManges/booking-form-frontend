@@ -58,7 +58,7 @@ export const PhoneInputs = () => {
                 ref={refs[index]}
                 id={`phone-input-${index + 1}`}
                 value={phoneInput[index]}
-                placeholder={`${"5".repeat(length)}`}
+                placeholder={`${"0".repeat(length)}`}
                 onChange={createOnChangeHandler(index)}
               />
               {!isLastIteration && (
