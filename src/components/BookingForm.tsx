@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import bsClasses from "../styling/bootstrap-classes";
 import { PhoneInputs } from "./PhoneInputs";
-import { TimeInputs } from "./TimeInputs";
 import Calendar from "react-calendar";
 import { getMinMaxDates } from "../utils.";
+import TimeDropDown from "./TimeDropDown";
+import { API } from "../api/getData";
 
 type ValuePiece = Date | null;
 
@@ -13,12 +14,26 @@ export default function BookingForm() {
   const initialMinDate = getMinMaxDates().twoDaysInAdvance;
   const initialMaxDate = getMinMaxDates().oneYearInAdvance;
 
+  const [hours, setHours] = useState<string>("12");
+  const [minutes, setMinutes] = useState<string>("00");
+  const [period, setPeriod] = useState<string>("PM");
   const [date, setDate] = useState<DateValue>(initialMinDate);
   const minDateRef = useRef<Date>(initialMinDate);
   const maxDateRef = useRef<Date>(initialMaxDate);
   const calendarRef = useRef<HTMLDivElement>(null);
 
+  const [outdoors, setOutdoors] = useState<boolean>(false);
+
+  const [allCharacters, setAllCharacters] = useState<
+    { id: number; name: string }[]
+  >([]);
+  9;
+
   useEffect(() => {
+    API.getCharacters().then((allCharacters) => {
+      setAllCharacters(allCharacters);
+    });
+
     if (calendarRef.current) {
       calendarRef.current.id = "react-calendar";
     }
@@ -135,19 +150,26 @@ export default function BookingForm() {
               calendarType="gregory" // Makes Sunday the first day of the week.
               tileDisabled={({ date }) => date.getDay() === 0} // Disables Sunday tiles.
             />
+          </div>
 
+          <div className="col-12 col-lg-6 d-flex flex-column">
             <div className="my-3 mx-2 d-flex">
               <label className={bsClasses.label} htmlFor="timeInput">
                 Time of event
                 <span className="text-danger ps-2">*</span>
               </label>
               <div>
-                <TimeInputs />
+                <TimeDropDown
+                  hours={hours}
+                  setHours={setHours}
+                  minutes={minutes}
+                  setMinutes={setMinutes}
+                  period={period}
+                  setPeriod={setPeriod}
+                />
               </div>
             </div>
-          </div>
 
-          <div className="col-12 col-lg-6 d-flex flex-column">
             <div className={bsClasses.inputCard}>
               <label className={bsClasses.label} htmlFor="addressInput">
                 Address of venue
@@ -191,7 +213,22 @@ export default function BookingForm() {
             <span className="text-danger ps-2">*</span>
           </label>
           <div className={bsClasses.inputWrapper}>
-            <PhoneInputs />
+            <div className="radio-wrapper">
+              {["yes", "no"].map((item, index) => (
+                <div key={index}>
+                  <input
+                    type="radio"
+                    name="outdoors"
+                    id={item}
+                    onChange={(e) => {
+                      setOutdoors(e.target.id === "yes");
+                    }}
+                    checked={item === "yes" ? outdoors : !outdoors}
+                  />
+                  <label htmlFor={item}>{item === "yes" ? "yes" : "no"}</label>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -201,7 +238,11 @@ export default function BookingForm() {
             <span className="text-danger ps-2">*</span>
           </label>
           <div className={bsClasses.inputWrapper}>
-            <PhoneInputs />
+            <ol>
+              {allCharacters.map((character) => (
+                <li key={character.name}>{character.name}</li>
+              ))}
+            </ol>
           </div>
         </div>
 
