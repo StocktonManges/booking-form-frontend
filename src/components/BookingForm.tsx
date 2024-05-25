@@ -5,6 +5,8 @@ import Calendar from "react-calendar";
 import { getMinMaxDates } from "../utils.";
 import TimeDropDown from "./TimeDropDown";
 import { API } from "../api/getData";
+import { Character, Package } from "../types";
+import RadioInputs from "./RadioInputs";
 
 type ValuePiece = Date | null;
 
@@ -22,24 +24,41 @@ export default function BookingForm() {
   const maxDateRef = useRef<Date>(initialMaxDate);
   const calendarRef = useRef<HTMLDivElement>(null);
 
-  const [outdoors, setOutdoors] = useState<boolean>(false);
+  const [outdoors, setOutdoors] = useState<string>("no");
+  const [charSelection, setCharSelection] = useState<string[]>([]);
+  const [packageName, setPackageName] = useState<string>("");
 
-  const [allCharacters, setAllCharacters] = useState<
-    { id: number; name: string }[]
-  >([]);
-  9;
+  const [allCharacters, setAllCharacters] = useState<Character[]>([]);
+  const [allPackages, setAllPackages] = useState<Package[]>([]);
+
+  const multiSelectionHandler = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    currSelectionArr: string[],
+    setSelectionArrState: React.Dispatch<React.SetStateAction<string[]>>
+  ) => {
+    const itemIsSelected = currSelectionArr.find(
+      (itemName) => itemName === e.target.value
+    );
+    setSelectionArrState((prev) =>
+      !itemIsSelected
+        ? [...prev, e.target.value]
+        : prev.filter((itemName) => itemName !== e.target.value)
+    );
+  };
 
   useEffect(() => {
     API.getCharacters().then((allCharacters) => {
       setAllCharacters(allCharacters);
     });
+    API.getPackages().then((allPackages) => {
+      setAllPackages(allPackages);
+    });
 
+    // Set min and max date prop values for the calendar.
     if (calendarRef.current) {
       calendarRef.current.id = "react-calendar";
     }
-
     const { twoDaysInAdvance, oneYearInAdvance } = getMinMaxDates();
-
     if (
       minDateRef.current.getDate() < twoDaysInAdvance.getDate() &&
       minDateRef.current.getFullYear() === twoDaysInAdvance.getFullYear() &&
@@ -47,9 +66,8 @@ export default function BookingForm() {
     ) {
       minDateRef.current = twoDaysInAdvance;
     }
-
     maxDateRef.current = oneYearInAdvance;
-  });
+  }, []);
 
   return (
     <section className={"container" + bsClasses.flexColumnCentered}>
@@ -146,7 +164,7 @@ export default function BookingForm() {
               value={date}
               minDate={minDateRef.current}
               maxDate={maxDateRef.current}
-              minDetail="year"
+              minDetail="month"
               calendarType="gregory" // Makes Sunday the first day of the week.
               tileDisabled={({ date }) => date.getDay() === 0} // Disables Sunday tiles.
             />
@@ -208,29 +226,26 @@ export default function BookingForm() {
         </div>
 
         <div className={bsClasses.inputCard}>
-          <label className={bsClasses.label} htmlFor="indoorsInput">
-            Indoors
+          <label className={bsClasses.label} htmlFor="outdoorsInput">
+            Outdoors
             <span className="text-danger ps-2">*</span>
           </label>
           <div className={bsClasses.inputWrapper}>
-            <div className="radio-wrapper">
-              {["yes", "no"].map((item, index) => (
-                <div key={index}>
-                  <input
-                    type="radio"
-                    name="outdoors"
-                    id={item}
-                    onChange={(e) => {
-                      setOutdoors(e.target.id === "yes");
-                    }}
-                    checked={item === "yes" ? outdoors : !outdoors}
-                  />
-                  <label htmlFor={item}>{item === "yes" ? "yes" : "no"}</label>
-                </div>
-              ))}
-            </div>
+            <RadioInputs
+              inputName="outdoors"
+              arr={["yes", "no"]}
+              state={outdoors}
+              setState={setOutdoors}
+            />
           </div>
         </div>
+
+        <h2>Character Selection</h2>
+        <ol>
+          {charSelection.map((char) => (
+            <li key={char}>{char}</li>
+          ))}
+        </ol>
 
         <div className={bsClasses.inputCard}>
           <label className={bsClasses.label} htmlFor="characterInput">
@@ -240,7 +255,18 @@ export default function BookingForm() {
           <div className={bsClasses.inputWrapper}>
             <ol>
               {allCharacters.map((character) => (
-                <li key={character.name}>{character.name}</li>
+                <li key={character.name}>
+                  <input
+                    onChange={(e) => {
+                      multiSelectionHandler(e, charSelection, setCharSelection);
+                    }}
+                    value={character.name}
+                    type="checkbox"
+                    name={character.name}
+                    id={character.name}
+                  />
+                  <label htmlFor={character.name}>{character.name}</label>
+                </li>
               ))}
             </ol>
           </div>
@@ -252,7 +278,12 @@ export default function BookingForm() {
             <span className="text-danger ps-2">*</span>
           </label>
           <div className={bsClasses.inputWrapper}>
-            <PhoneInputs />
+            <RadioInputs
+              inputName="package"
+              arr={allPackages.map((eventPackage) => eventPackage.name)}
+              state={packageName}
+              setState={setPackageName}
+            />
           </div>
         </div>
 
@@ -261,9 +292,7 @@ export default function BookingForm() {
             Activity
             <span className="text-danger ps-2">*</span>
           </label>
-          <div className={bsClasses.inputWrapper}>
-            <PhoneInputs />
-          </div>
+          <div className={bsClasses.inputWrapper}></div>
         </div>
 
         <div className={bsClasses.inputCard}>
@@ -271,9 +300,7 @@ export default function BookingForm() {
             How many participants
             <span className="text-danger ps-2">*</span>
           </label>
-          <div className={bsClasses.inputWrapper}>
-            <PhoneInputs />
-          </div>
+          <div className={bsClasses.inputWrapper}></div>
         </div>
 
         <div className={bsClasses.inputCard}>
@@ -281,9 +308,7 @@ export default function BookingForm() {
             Age range
             <span className="text-danger ps-2">*</span>
           </label>
-          <div className={bsClasses.inputWrapper}>
-            <PhoneInputs />
-          </div>
+          <div className={bsClasses.inputWrapper}></div>
         </div>
 
         <div className={bsClasses.inputCard}>
@@ -322,36 +347,28 @@ export default function BookingForm() {
             First encounter
             <span className="text-danger ps-2">*</span>
           </label>
-          <div className={bsClasses.inputWrapper}>
-            <PhoneInputs />
-          </div>
+          <div className={bsClasses.inputWrapper}></div>
         </div>
 
         <div className={bsClasses.inputCard}>
           <label className={bsClasses.label} htmlFor="notesInput">
             Notes
           </label>
-          <div className={bsClasses.inputWrapper}>
-            <PhoneInputs />
-          </div>
+          <div className={bsClasses.inputWrapper}></div>
         </div>
 
         <div className={bsClasses.inputCard}>
           <label className={bsClasses.label} htmlFor="couponInput">
             Coupon code
           </label>
-          <div className={bsClasses.inputWrapper}>
-            <PhoneInputs />
-          </div>
+          <div className={bsClasses.inputWrapper}></div>
         </div>
 
         <div className={bsClasses.inputCard}>
           <label className={bsClasses.label} htmlFor="referralInput">
             Referral code
           </label>
-          <div className={bsClasses.inputWrapper}>
-            <PhoneInputs />
-          </div>
+          <div className={bsClasses.inputWrapper}></div>
         </div>
 
         <div className={bsClasses.inputCard}>
@@ -359,9 +376,7 @@ export default function BookingForm() {
             How did you find us
             <span className="text-danger ps-2">*</span>
           </label>
-          <div className={bsClasses.inputWrapper}>
-            <PhoneInputs />
-          </div>
+          <div className={bsClasses.inputWrapper}></div>
         </div>
 
         <button className="btn btn-primary btn-lg">Submit</button>

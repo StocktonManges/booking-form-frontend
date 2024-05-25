@@ -1,12 +1,30 @@
-const baseURL = "https://bookingform-jhcx7uxfca-uc.a.run.app/";
+import { z } from "zod";
+import { Character, Package, characterSchema, packageSchema } from "../types";
+
+// const baseURL = "https://bookingform-jhcx7uxfca-uc.a.run.app/";
+const baseURL =
+  "http://127.0.0.1:5001/booking-form-a7791/us-central1/bookingForm/";
 
 export const API = {
-  getCharacters: () =>
-    fetch(baseURL + "character").then((response) => {
-      if (!response.ok) {
-        throw new Error("Unable to fetch characters.");
-      }
+  getCharacters: (): Promise<Character[]> =>
+    fetch(baseURL + "character")
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Unable to fetch characters.");
+        }
 
-      return response.json();
-    }),
+        return response.json();
+      })
+      .then((allCharacters) => z.array(characterSchema).parse(allCharacters)),
+
+  getPackages: (): Promise<Package[]> =>
+    fetch(baseURL + "package")
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Unable to fetch packages.");
+        }
+
+        return response.json();
+      })
+      .then((allPackages) => z.array(packageSchema).parse(allPackages)),
 };
