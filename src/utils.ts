@@ -4,6 +4,9 @@ export const getMinMaxDates = () => {
   // Create a date 2 days in the future
   const twoDaysInAdvance = new Date(today);
   twoDaysInAdvance.setDate(today.getDate() + 2);
+  if (twoDaysInAdvance.getDay() === 0) {
+    twoDaysInAdvance.setDate(twoDaysInAdvance.getDate() + 1);
+  }
 
   // Create a date one year in the future
   const oneYearInAdvance = new Date(today);

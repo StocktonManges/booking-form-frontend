@@ -2,34 +2,71 @@ import { useEffect, useRef, useState } from "react";
 import bsClasses from "../styling/bootstrap-classes";
 import { PhoneInputs } from "./PhoneInputs";
 import Calendar from "react-calendar";
-import { getMinMaxDates } from "../utils.";
+import { getMinMaxDates } from "../utils";
 import TimeDropDown from "./TimeDropDown";
 import { API } from "../api/getData";
-import { Character, Package } from "../types";
-import RadioInputs from "./RadioInputs";
+import {
+  Activity,
+  Character,
+  IncompatibleActivitiesAndPackages,
+  Package,
+} from "../types";
 
 type ValuePiece = Date | null;
 
 type DateValue = ValuePiece | [ValuePiece, ValuePiece];
 
+const foundUsMethodsArr = [
+  "Facebook",
+  "Instagram",
+  "County Fair",
+  "Classic Fun Center",
+  "Word of mouth",
+  "Other",
+];
+
 export default function BookingForm() {
   const initialMinDate = getMinMaxDates().twoDaysInAdvance;
   const initialMaxDate = getMinMaxDates().oneYearInAdvance;
-
-  const [hours, setHours] = useState<string>("12");
-  const [minutes, setMinutes] = useState<string>("00");
-  const [period, setPeriod] = useState<string>("PM");
-  const [date, setDate] = useState<DateValue>(initialMinDate);
   const minDateRef = useRef<Date>(initialMinDate);
   const maxDateRef = useRef<Date>(initialMaxDate);
   const calendarRef = useRef<HTMLDivElement>(null);
 
-  const [outdoors, setOutdoors] = useState<string>("no");
+  const [parentFirstName, setParentFirstName] = useState<string>("");
+  const [parentLastName, setParentLastName] = useState<string>("");
+  const [childFirstName, setChildFirstName] = useState<string>("");
+  const [childLastName, setChildLastName] = useState<string>("");
+  const [childAge, setChildAge] = useState<number>("");
+  const [hours, setHours] = useState<string>("12");
+  const [minutes, setMinutes] = useState<string>("00");
+  const [period, setPeriod] = useState<string>("PM");
+  const [date, setDate] = useState<DateValue>(initialMinDate);
+  const [outdoors, setOutdoors] = useState<boolean>(false);
   const [charSelection, setCharSelection] = useState<string[]>([]);
-  const [packageName, setPackageName] = useState<string>("");
+  const [activitySelection, setActivitySelection] = useState<string[]>([]);
+  const [selectedPackage, setSelectedPackage] = useState<Package>({
+    id: -1,
+    name: "",
+    activityCount: 0,
+  });
+  const [incompatibleActivityIds, setIncompatibleActivityIds] = useState<
+    number[]
+  >([]);
+  const [participantCount, setParticipantCount] = useState<number>(1);
+  const [minAge, setMinAge] = useState<number>(0);
+  const [maxAge, setMaxAge] = useState<number>(0);
+  const [notes, setNotes] = useState<string>("");
+  const [couponCode, setCouponCode] = useState<string>("");
+  const [firstEncounter, setFirstEncounter] = useState<string>("");
+  const [foundUsMethod, setFoundUsMethod] = useState<string>("");
+  const [otherInput, setOtherInput] = useState<string | null>(null);
 
   const [allCharacters, setAllCharacters] = useState<Character[]>([]);
   const [allPackages, setAllPackages] = useState<Package[]>([]);
+  const [allActivities, setAllActivities] = useState<Activity[]>([]);
+  const [allIncompatiblePairs, setAllIncompatiblePairs] = useState<
+    IncompatibleActivitiesAndPackages[]
+  >([]);
 
   const multiSelectionHandler = (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -37,21 +74,56 @@ export default function BookingForm() {
     setSelectionArrState: React.Dispatch<React.SetStateAction<string[]>>
   ) => {
     const itemIsSelected = currSelectionArr.find(
-      (itemName) => itemName === e.target.value
+      (itemName) => itemName === e.target.id
     );
     setSelectionArrState((prev) =>
       !itemIsSelected
-        ? [...prev, e.target.value]
-        : prev.filter((itemName) => itemName !== e.target.value)
+        ? [...prev, e.target.id]
+        : prev.filter((itemName) => itemName !== e.target.id)
     );
   };
 
+  // Display "face paint" last.
+  const sortActivities = (activities: Activity[]) => {
+    return activities.sort((a, b) => {
+      if (a.name === "face paint") return 1;
+      if (b.name === "face paint") return -1;
+      return a.name.localeCompare(b.name);
+    });
+  };
+
+  useEffect(() => {
+    setOtherInput(null);
+  }, [foundUsMethod]);
+
+  useEffect(() => {
+    // Reset the activity selection.
+    setActivitySelection([]);
+
+    // Update the list of activities that are not compatible with the
+    // current selected package.
+    const incompatibleActivityIds = allIncompatiblePairs
+      .filter((item) => item.packageId === selectedPackage.id)
+      .map((item) => item.activityId);
+    setIncompatibleActivityIds(incompatibleActivityIds);
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPackage]);
+
   useEffect(() => {
     API.getCharacters().then((allCharacters) => {
-      setAllCharacters(allCharacters);
+      setAllCharacters(
+        allCharacters.sort((a, b) => a.name.localeCompare(b.name))
+      );
     });
     API.getPackages().then((allPackages) => {
       setAllPackages(allPackages);
+    });
+    API.getActivities().then((allActivities) => {
+      setAllActivities(sortActivities(allActivities));
+    });
+    API.getIncompatibleActivitiesAndPackages().then((allData) => {
+      setAllIncompatiblePairs(allData);
     });
 
     // Set min and max date prop values for the calendar.
@@ -92,7 +164,7 @@ export default function BookingForm() {
         <div className="row d-flex w-100">
           <div className={"col-lg-6 col-12" + bsClasses.inputCard}>
             <label className={bsClasses.label} htmlFor="nameInput">
-              Parent Name
+              Parent Name:
               <span className="text-danger ps-2">*</span>
             </label>
             <div className="row">
@@ -102,9 +174,12 @@ export default function BookingForm() {
                     "singleLineTextInput" + bsClasses.singleLineTextInput
                   }
                   type="text"
-                  name="nameInput"
-                  id="nameInput"
+                  name="parentFirstName"
                   placeholder="First..."
+                  value={parentFirstName}
+                  onChange={(e) => {
+                    setParentFirstName(e.target.value);
+                  }}
                 />
               </div>
               <div className={"col-md-6 col-12" + bsClasses.inputWrapper}>
@@ -113,9 +188,12 @@ export default function BookingForm() {
                     "singleLineTextInput" + bsClasses.singleLineTextInput
                   }
                   type="text"
-                  name="nameInput"
-                  id="nameInput"
+                  name="parentLastName"
                   placeholder="Last..."
+                  value={parentLastName}
+                  onChange={(e) => {
+                    setParentLastName(e.target.value);
+                  }}
                 />
               </div>
             </div>
@@ -124,7 +202,7 @@ export default function BookingForm() {
           <div className="col-lg-6 col-12 d-flex flex-column flex-sm-row">
             <div className={"col-sm-6 col-12" + bsClasses.inputCard}>
               <label className={bsClasses.label} htmlFor="emailInput">
-                Email
+                Email:
                 <span className="text-danger ps-2">*</span>
               </label>
               <div className={bsClasses.inputWrapper}>
@@ -142,7 +220,7 @@ export default function BookingForm() {
 
             <div className={"col-sm-6 col-12" + bsClasses.inputCard}>
               <label className={bsClasses.label} htmlFor="phoneInput">
-                Phone
+                Phone:
                 <span className="text-danger ps-2">*</span>
               </label>
               <div className={bsClasses.inputWrapper}>
@@ -155,7 +233,7 @@ export default function BookingForm() {
         <div className="row d-flex justify-content-between w-100">
           <div className={"col-12 col-lg-6" + bsClasses.inputCard}>
             <label className={bsClasses.label} htmlFor="dateInput">
-              Date of event
+              Date of event:
               <span className="text-danger ps-2">*</span>
             </label>
             <Calendar
@@ -173,7 +251,7 @@ export default function BookingForm() {
           <div className="col-12 col-lg-6 d-flex flex-column">
             <div className="my-3 mx-2 d-flex">
               <label className={bsClasses.label} htmlFor="timeInput">
-                Time of event
+                Time of event:
                 <span className="text-danger ps-2">*</span>
               </label>
               <div>
@@ -190,7 +268,7 @@ export default function BookingForm() {
 
             <div className={bsClasses.inputCard}>
               <label className={bsClasses.label} htmlFor="addressInput">
-                Address of venue
+                Address of venue:
                 <span className="text-danger ps-2">*</span>
               </label>
               <div className="d-flex flex-column">
@@ -227,29 +305,39 @@ export default function BookingForm() {
 
         <div className={bsClasses.inputCard}>
           <label className={bsClasses.label} htmlFor="outdoorsInput">
-            Outdoors
+            <div>Will the party be indoors or outdoors?</div>
+            <div className="fs-4">
+              Please remember that our costumes can be extra hot in the summer
+              and take temperature into consideration.
+            </div>
             <span className="text-danger ps-2">*</span>
           </label>
           <div className={bsClasses.inputWrapper}>
-            <RadioInputs
-              inputName="outdoors"
-              arr={["yes", "no"]}
-              state={outdoors}
-              setState={setOutdoors}
-            />
+            <div className="radio-wrapper">
+              {["yes", "no"].map((item, index) => (
+                <div key={"outdoors" + index}>
+                  <input
+                    type="radio"
+                    name="outdoors"
+                    id={item}
+                    onChange={(e) => {
+                      setOutdoors(e.target.id === "yes");
+                    }}
+                    checked={
+                      (item === "yes" && outdoors) ||
+                      (item === "no" && !outdoors)
+                    }
+                  />
+                  <label htmlFor={item}>{item}</label>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
-        <h2>Character Selection</h2>
-        <ol>
-          {charSelection.map((char) => (
-            <li key={char}>{char}</li>
-          ))}
-        </ol>
-
         <div className={bsClasses.inputCard}>
           <label className={bsClasses.label} htmlFor="characterInput">
-            Character Selection
+            Character(s):
             <span className="text-danger ps-2">*</span>
           </label>
           <div className={bsClasses.inputWrapper}>
@@ -260,7 +348,6 @@ export default function BookingForm() {
                     onChange={(e) => {
                       multiSelectionHandler(e, charSelection, setCharSelection);
                     }}
-                    value={character.name}
                     type="checkbox"
                     name={character.name}
                     id={character.name}
@@ -274,46 +361,121 @@ export default function BookingForm() {
 
         <div className={bsClasses.inputCard}>
           <label className={bsClasses.label} htmlFor="packageInput">
-            Package
+            Package:
             <span className="text-danger ps-2">*</span>
           </label>
           <div className={bsClasses.inputWrapper}>
-            <RadioInputs
-              inputName="package"
-              arr={allPackages.map((eventPackage) => eventPackage.name)}
-              state={packageName}
-              setState={setPackageName}
-            />
+            <div className="radio-wrapper">
+              {allPackages.map((packageItem) => (
+                <div key={packageItem.name}>
+                  <input
+                    type="radio"
+                    name="package"
+                    id={packageItem.name}
+                    onChange={() => {
+                      if (selectedPackage !== packageItem) {
+                        setSelectedPackage(packageItem);
+                      }
+                    }}
+                    checked={packageItem.name === selectedPackage.name}
+                  />
+                  <label htmlFor={packageItem.name}>{packageItem.name}</label>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
         <div className={bsClasses.inputCard}>
           <label className={bsClasses.label} htmlFor="activityInput">
-            Activity
+            Select your activity / activities:
             <span className="text-danger ps-2">*</span>
           </label>
-          <div className={bsClasses.inputWrapper}></div>
+          <div className={bsClasses.inputWrapper}>
+            <ol>
+              {allActivities.map((activity) => (
+                <li key={activity.name}>
+                  <input
+                    onChange={(e) => {
+                      multiSelectionHandler(
+                        e,
+                        activitySelection,
+                        setActivitySelection
+                      );
+                    }}
+                    type="checkbox"
+                    name={activity.name}
+                    id={activity.name}
+                    disabled={
+                      // Activity is incompatible with selectedPackage
+                      incompatibleActivityIds.includes(activity.id) ||
+                      // Maximum number of activities is selected
+                      (activitySelection.length ===
+                        selectedPackage.activityCount &&
+                        !activitySelection.includes(activity.name))
+                    }
+                    checked={activitySelection.includes(activity.name)}
+                  />
+                  <label htmlFor={activity.name}>
+                    {activity.name === "face paint"
+                      ? activity.name + " (not applicable to Wish package)"
+                      : activity.name}
+                  </label>
+                </li>
+              ))}
+            </ol>
+          </div>
         </div>
 
         <div className={bsClasses.inputCard}>
           <label className={bsClasses.label} htmlFor="participantInput">
-            How many participants
+            How many (participating) guests?
             <span className="text-danger ps-2">*</span>
           </label>
-          <div className={bsClasses.inputWrapper}></div>
+          <div className={bsClasses.inputWrapper}>
+            <input
+              type="number"
+              name="participantCount"
+              value={participantCount}
+              onChange={(e) => {
+                setParticipantCount(Number(e.target.value));
+              }}
+            />
+          </div>
         </div>
 
         <div className={bsClasses.inputCard}>
           <label className={bsClasses.label} htmlFor="ageRangeInput">
-            Age range
+            What is the age range of the guests?
             <span className="text-danger ps-2">*</span>
+            <div className="fs-4">(youngest to oldest)</div>
           </label>
-          <div className={bsClasses.inputWrapper}></div>
+          <div className={bsClasses.inputWrapper}>
+            <div>
+              <input
+                type="number"
+                name="minAge"
+                value={minAge}
+                onChange={(e) => {
+                  setMinAge(Number(e.target.value));
+                }}
+              />
+              <span>to</span>
+              <input
+                type="number"
+                name="maxAge"
+                value={maxAge}
+                onChange={(e) => {
+                  setMaxAge(Number(e.target.value));
+                }}
+              />
+            </div>
+          </div>
         </div>
 
         <div className={bsClasses.inputCard}>
           <label className={bsClasses.label} htmlFor="childNameInput">
-            Child Name
+            What is the birthday child's name?
             <span className="text-danger ps-2">*</span>
           </label>
           <div className="d-flex flex-column flex-lg-row">
@@ -323,9 +485,12 @@ export default function BookingForm() {
                   "singleLineTextInput" + bsClasses.singleLineTextInput
                 }
                 type="text"
-                name="nameInput"
-                id="nameInput"
+                name="childFirstName"
                 placeholder="First..."
+                value={childFirstName}
+                onChange={(e) => {
+                  setChildFirstName(e.target.value);
+                }}
               />
             </div>
             <div className={bsClasses.inputWrapper}>
@@ -334,49 +499,123 @@ export default function BookingForm() {
                   "singleLineTextInput" + bsClasses.singleLineTextInput
                 }
                 type="text"
-                name="nameInput"
-                id="nameInput"
+                name="childLastName"
                 placeholder="Last..."
+                value={childLastName}
+                onChange={(e) => {
+                  setChildLastName(e.target.value);
+                }}
               />
             </div>
           </div>
         </div>
 
         <div className={bsClasses.inputCard}>
-          <label className={bsClasses.label} htmlFor="firstEncounterInput">
-            First encounter
+          <label className={bsClasses.label} htmlFor="childAge">
+            What is the birthday child's age?
             <span className="text-danger ps-2">*</span>
           </label>
-          <div className={bsClasses.inputWrapper}></div>
+          <div className={bsClasses.inputWrapper}>
+            <input
+              type="number"
+              name="childAge"
+              id="childAge"
+              value={childAge}
+              onChange={(e) => {
+                setChildAge(Number(e.target.value));
+              }}
+            />
+          </div>
+        </div>
+
+        <div className={bsClasses.inputCard}>
+          <label className={bsClasses.label} htmlFor="firstEncounterInput">
+            Has the birthday child met the character(s) before? We don't want
+            the character(s) to forget them!
+            <span className="text-danger ps-2">*</span>
+          </label>
+          <div className={bsClasses.inputWrapper}>
+            <textarea
+              name="firstEncounter"
+              id="firstEncounter"
+              value={firstEncounter}
+              onChange={(e) => {
+                setFirstEncounter(e.target.value);
+              }}
+            ></textarea>
+          </div>
         </div>
 
         <div className={bsClasses.inputCard}>
           <label className={bsClasses.label} htmlFor="notesInput">
-            Notes
+            Any notes for the performer?
           </label>
-          <div className={bsClasses.inputWrapper}></div>
+          <div className={bsClasses.inputWrapper}>
+            <textarea
+              name="notes"
+              id="notes"
+              value={notes}
+              onChange={(e) => {
+                setNotes(e.target.value);
+              }}
+            ></textarea>
+          </div>
         </div>
 
         <div className={bsClasses.inputCard}>
           <label className={bsClasses.label} htmlFor="couponInput">
-            Coupon code
+            Coupon code:
           </label>
-          <div className={bsClasses.inputWrapper}></div>
-        </div>
-
-        <div className={bsClasses.inputCard}>
-          <label className={bsClasses.label} htmlFor="referralInput">
-            Referral code
-          </label>
-          <div className={bsClasses.inputWrapper}></div>
+          <div className={bsClasses.inputWrapper}>
+            <input
+              type="text"
+              name="couponInput"
+              id="couponInput"
+              value={couponCode}
+              onChange={(e) => {
+                setCouponCode(e.target.value);
+              }}
+            />
+          </div>
         </div>
 
         <div className={bsClasses.inputCard}>
           <label className={bsClasses.label} htmlFor="exposureInput">
-            How did you find us
+            How did you hear about us?
             <span className="text-danger ps-2">*</span>
           </label>
-          <div className={bsClasses.inputWrapper}></div>
+          <div className={bsClasses.inputWrapper}>
+            <ul>
+              {foundUsMethodsArr.map((method) => (
+                <li key={method}>
+                  <input
+                    type="radio"
+                    name="foundUsMethods"
+                    id={method}
+                    onChange={(e) => {
+                      setFoundUsMethod(e.target.id);
+                    }}
+                  />
+                  <span>
+                    <label htmlFor={method}>{method}</label>
+                    <span>
+                      {method.toLowerCase().includes("other") && (
+                        <input
+                          type="text"
+                          name="otherInput"
+                          value={otherInput ? otherInput : ""}
+                          onChange={(e) => {
+                            setOtherInput(e.target.value);
+                          }}
+                          disabled={foundUsMethod !== method}
+                        />
+                      )}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
 
         <button className="btn btn-primary btn-lg">Submit</button>

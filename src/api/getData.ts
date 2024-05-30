@@ -1,5 +1,14 @@
 import { z } from "zod";
-import { Character, Package, characterSchema, packageSchema } from "../types";
+import {
+  Activity,
+  Character,
+  IncompatibleActivitiesAndPackages,
+  Package,
+  activitySchema,
+  characterSchema,
+  incompatibleActivitiesAndPackagesSchema,
+  packageSchema,
+} from "../types";
 
 // const baseURL = "https://bookingform-jhcx7uxfca-uc.a.run.app/";
 const baseURL =
@@ -27,4 +36,32 @@ export const API = {
         return response.json();
       })
       .then((allPackages) => z.array(packageSchema).parse(allPackages)),
+
+  getActivities: (): Promise<Activity[]> =>
+    fetch(baseURL + "activity")
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Unable to fetch activities.");
+        }
+
+        return response.json();
+      })
+      .then((allActivities) => z.array(activitySchema).parse(allActivities)),
+
+  getIncompatibleActivitiesAndPackages: (): Promise<
+    IncompatibleActivitiesAndPackages[]
+  > =>
+    fetch(baseURL + "incompatibleActivitiesAndPackages")
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(
+            "Unable to fetch incompatible activities and packages."
+          );
+        }
+
+        return response.json();
+      })
+      .then((allData) =>
+        z.array(incompatibleActivitiesAndPackagesSchema).parse(allData)
+      ),
 };
