@@ -1,13 +1,16 @@
 import { z } from "zod";
 import {
   Activity,
+  BookingForm,
   Character,
   IncompatibleActivitiesAndPackages,
   Package,
+  SubmitBookingFormResponse,
   activitySchema,
   characterSchema,
   incompatibleActivitiesAndPackagesSchema,
   packageSchema,
+  submitBookingFormResponseSchema,
 } from "../types";
 
 // const baseURL = "https://bookingform-jhcx7uxfca-uc.a.run.app/";
@@ -64,4 +67,17 @@ export const API = {
       .then((allData) =>
         z.array(incompatibleActivitiesAndPackagesSchema).parse(allData)
       ),
+
+  submitBookingForm: (
+    bookingFormData: BookingForm
+  ): Promise<SubmitBookingFormResponse> =>
+    fetch(baseURL + "event", {
+      method: "POST",
+      body: JSON.stringify(bookingFormData),
+    }).then((response) => {
+      if (!response.ok) {
+        throw new Error("Error submitting booking form.");
+      }
+      return submitBookingFormResponseSchema.parse(response.json());
+    }),
 };

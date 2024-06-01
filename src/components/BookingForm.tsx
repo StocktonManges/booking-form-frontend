@@ -2,19 +2,23 @@ import { useEffect, useRef, useState } from "react";
 import bsClasses from "../styling/bootstrap-classes";
 import { PhoneInputs } from "./PhoneInputs";
 import Calendar from "react-calendar";
-import { getMinMaxDates } from "../utils";
+import {
+  capitalize,
+  getMinMaxDates,
+  isCharacterInSelection,
+  multiSelectionHandler,
+  sortActivities,
+  verifyActivityIsCompatibleWithAllPackages,
+} from "../utils";
 import TimeDropDown from "./TimeDropDown";
-import { API } from "../api/getData";
+import { API } from "../api/api";
 import {
   Activity,
   Character,
+  DateValue,
   IncompatibleActivitiesAndPackages,
   Package,
 } from "../types";
-
-type ValuePiece = Date | null;
-
-type DateValue = ValuePiece | [ValuePiece, ValuePiece];
 
 const foundUsMethodsArr = [
   "Facebook",
@@ -25,6 +29,8 @@ const foundUsMethodsArr = [
   "Other",
 ];
 
+const maxParticipants = 50;
+
 export default function BookingForm() {
   const initialMinDate = getMinMaxDates().twoDaysInAdvance;
   const initialMaxDate = getMinMaxDates().oneYearInAdvance;
@@ -32,27 +38,33 @@ export default function BookingForm() {
   const maxDateRef = useRef<Date>(initialMaxDate);
   const calendarRef = useRef<HTMLDivElement>(null);
 
+  const [email, setEmail] = useState<string>("");
   const [parentFirstName, setParentFirstName] = useState<string>("");
   const [parentLastName, setParentLastName] = useState<string>("");
+  const [phoneNumber, setPhoneNumber] = useState<[string, string, string]>([
+    "",
+    "",
+    "",
+  ]);
   const [childFirstName, setChildFirstName] = useState<string>("");
   const [childLastName, setChildLastName] = useState<string>("");
-  const [childAge, setChildAge] = useState<number>("");
+  const [childAge, setChildAge] = useState<number>(0);
   const [hours, setHours] = useState<string>("12");
   const [minutes, setMinutes] = useState<string>("00");
   const [period, setPeriod] = useState<string>("PM");
   const [date, setDate] = useState<DateValue>(initialMinDate);
   const [outdoors, setOutdoors] = useState<boolean>(false);
-  const [charSelection, setCharSelection] = useState<string[]>([]);
+  const [charSelection, setCharSelection] = useState<Character[]>([]);
   const [activitySelection, setActivitySelection] = useState<string[]>([]);
   const [selectedPackage, setSelectedPackage] = useState<Package>({
     id: -1,
     name: "",
     activityCount: 0,
+    durationInMinutes: 0,
   });
-  const [incompatibleActivityIds, setIncompatibleActivityIds] = useState<
-    number[]
-  >([]);
-  const [participantCount, setParticipantCount] = useState<number>(1);
+  const [currIncompatibleActivityIds, setCurrIncompatibleActivityIds] =
+    useState<number[]>([]);
+  const [participantCount, setParticipantCount] = useState<number>(0);
   const [minAge, setMinAge] = useState<number>(0);
   const [maxAge, setMaxAge] = useState<number>(0);
   const [notes, setNotes] = useState<string>("");
@@ -64,32 +76,16 @@ export default function BookingForm() {
   const [allCharacters, setAllCharacters] = useState<Character[]>([]);
   const [allPackages, setAllPackages] = useState<Package[]>([]);
   const [allActivities, setAllActivities] = useState<Activity[]>([]);
-  const [allIncompatiblePairs, setAllIncompatiblePairs] = useState<
-    IncompatibleActivitiesAndPackages[]
-  >([]);
+  const [
+    incompatibleActivitiesAndPackages,
+    setIncompatibleActivitiesAndPackages,
+  ] = useState<IncompatibleActivitiesAndPackages[]>([]);
 
-  const multiSelectionHandler = (
-    e: React.ChangeEvent<HTMLInputElement>,
-    currSelectionArr: string[],
-    setSelectionArrState: React.Dispatch<React.SetStateAction<string[]>>
-  ) => {
-    const itemIsSelected = currSelectionArr.find(
-      (itemName) => itemName === e.target.id
-    );
-    setSelectionArrState((prev) =>
-      !itemIsSelected
-        ? [...prev, e.target.id]
-        : prev.filter((itemName) => itemName !== e.target.id)
-    );
-  };
-
-  // Display "face paint" last.
-  const sortActivities = (activities: Activity[]) => {
-    return activities.sort((a, b) => {
-      if (a.name === "face paint") return 1;
-      if (b.name === "face paint") return -1;
-      return a.name.localeCompare(b.name);
-    });
+  const bookingFormData = {
+    email: email.toLowerCase(),
+    parentName:
+      parentFirstName.toLowerCase() + " " + parentLastName.toLowerCase(),
+    phoneNumber: 56,
   };
 
   useEffect(() => {
@@ -100,12 +96,13 @@ export default function BookingForm() {
     // Reset the activity selection.
     setActivitySelection([]);
 
-    // Update the list of activities that are not compatible with the
+    // Update the lists of activities that are not compatible with the
     // current selected package.
-    const incompatibleActivityIds = allIncompatiblePairs
-      .filter((item) => item.packageId === selectedPackage.id)
-      .map((item) => item.activityId);
-    setIncompatibleActivityIds(incompatibleActivityIds);
+    setCurrIncompatibleActivityIds(
+      incompatibleActivitiesAndPackages
+        .filter((item) => item.packageId === selectedPackage.id)
+        .map((item) => item.activityId)
+    );
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPackage]);
@@ -123,10 +120,10 @@ export default function BookingForm() {
       setAllActivities(sortActivities(allActivities));
     });
     API.getIncompatibleActivitiesAndPackages().then((allData) => {
-      setAllIncompatiblePairs(allData);
+      setIncompatibleActivitiesAndPackages(allData);
     });
 
-    // Set min and max date prop values for the calendar.
+    // Set min and max date prop values for React Calendar.
     if (calendarRef.current) {
       calendarRef.current.id = "react-calendar";
     }
@@ -214,6 +211,10 @@ export default function BookingForm() {
                   name="emailInput"
                   id="emailInput"
                   placeholder="Email..."
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                  }}
                 />
               </div>
             </div>
@@ -224,7 +225,10 @@ export default function BookingForm() {
                 <span className="text-danger ps-2">*</span>
               </label>
               <div className={bsClasses.inputWrapper}>
-                <PhoneInputs />
+                <PhoneInputs
+                  phoneInput={phoneNumber}
+                  setPhoneInput={setPhoneNumber}
+                />
               </div>
             </div>
           </div>
@@ -342,19 +346,30 @@ export default function BookingForm() {
           </label>
           <div className={bsClasses.inputWrapper}>
             <ol>
-              {allCharacters.map((character) => (
-                <li key={character.name}>
-                  <input
-                    onChange={(e) => {
-                      multiSelectionHandler(e, charSelection, setCharSelection);
-                    }}
-                    type="checkbox"
-                    name={character.name}
-                    id={character.name}
-                  />
-                  <label htmlFor={character.name}>{character.name}</label>
-                </li>
-              ))}
+              {allCharacters.map((currChar) => {
+                const { id, name, costume } = currChar;
+                return (
+                  <li key={"character" + id}>
+                    <input
+                      onChange={() => {
+                        const charIsSelected = charSelection.includes(currChar);
+                        setCharSelection((prev) =>
+                          !charIsSelected
+                            ? [...prev, currChar]
+                            : prev.filter((prevChar) => prevChar !== currChar)
+                        );
+                      }}
+                      type="checkbox"
+                      name={name}
+                      id={"character" + id}
+                      disabled={isCharacterInSelection(charSelection, currChar)}
+                    />
+                    <label htmlFor={"character" + id}>{`${capitalize(name)} ${
+                      costume ? "(" + capitalize(costume) + ")" : ""
+                    }`}</label>
+                  </li>
+                );
+              })}
             </ol>
           </div>
         </div>
@@ -366,22 +381,30 @@ export default function BookingForm() {
           </label>
           <div className={bsClasses.inputWrapper}>
             <div className="radio-wrapper">
-              {allPackages.map((packageItem) => (
-                <div key={packageItem.name}>
-                  <input
-                    type="radio"
-                    name="package"
-                    id={packageItem.name}
-                    onChange={() => {
-                      if (selectedPackage !== packageItem) {
-                        setSelectedPackage(packageItem);
-                      }
-                    }}
-                    checked={packageItem.name === selectedPackage.name}
-                  />
-                  <label htmlFor={packageItem.name}>{packageItem.name}</label>
-                </div>
-              ))}
+              {allPackages.map((packageItem) => {
+                const { name, durationInMinutes, activityCount } = packageItem;
+
+                return (
+                  <div key={packageItem.name}>
+                    <input
+                      type="radio"
+                      name="package"
+                      id={name}
+                      onChange={() => {
+                        if (selectedPackage !== packageItem) {
+                          setSelectedPackage(packageItem);
+                        }
+                      }}
+                      checked={name === selectedPackage.name}
+                    />
+                    <label htmlFor={name}>{`${capitalize(
+                      name
+                    )} (${durationInMinutes} minutes) ${activityCount} ${
+                      activityCount === 1 ? "activity" : "activities"
+                    }`}</label>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -408,7 +431,7 @@ export default function BookingForm() {
                     id={activity.name}
                     disabled={
                       // Activity is incompatible with selectedPackage
-                      incompatibleActivityIds.includes(activity.id) ||
+                      currIncompatibleActivityIds.includes(activity.id) ||
                       // Maximum number of activities is selected
                       (activitySelection.length ===
                         selectedPackage.activityCount &&
@@ -417,9 +440,10 @@ export default function BookingForm() {
                     checked={activitySelection.includes(activity.name)}
                   />
                   <label htmlFor={activity.name}>
-                    {activity.name === "face paint"
-                      ? activity.name + " (not applicable to Wish package)"
-                      : activity.name}
+                    {verifyActivityIsCompatibleWithAllPackages(
+                      activity,
+                      incompatibleActivitiesAndPackages
+                    )}
                   </label>
                 </li>
               ))}
@@ -434,11 +458,16 @@ export default function BookingForm() {
           </label>
           <div className={bsClasses.inputWrapper}>
             <input
-              type="number"
+              type="text"
               name="participantCount"
               value={participantCount}
               onChange={(e) => {
-                setParticipantCount(Number(e.target.value));
+                if (
+                  !isNaN(+e.target.value) &&
+                  +e.target.value <= maxParticipants
+                ) {
+                  setParticipantCount(+e.target.value);
+                }
               }}
             />
           </div>
@@ -453,20 +482,24 @@ export default function BookingForm() {
           <div className={bsClasses.inputWrapper}>
             <div>
               <input
-                type="number"
+                type="text"
                 name="minAge"
                 value={minAge}
                 onChange={(e) => {
-                  setMinAge(Number(e.target.value));
+                  if (!isNaN(+e.target.value) && +e.target.value <= 100) {
+                    setMinAge(+e.target.value);
+                  }
                 }}
               />
               <span>to</span>
               <input
-                type="number"
+                type="text"
                 name="maxAge"
                 value={maxAge}
                 onChange={(e) => {
-                  setMaxAge(Number(e.target.value));
+                  if (!isNaN(+e.target.value) && +e.target.value <= 100) {
+                    setMaxAge(+e.target.value);
+                  }
                 }}
               />
             </div>
@@ -517,12 +550,14 @@ export default function BookingForm() {
           </label>
           <div className={bsClasses.inputWrapper}>
             <input
-              type="number"
+              type="text"
               name="childAge"
               id="childAge"
               value={childAge}
               onChange={(e) => {
-                setChildAge(Number(e.target.value));
+                if (!isNaN(+e.target.value)) {
+                  setChildAge(Number(e.target.value));
+                }
               }}
             />
           </div>

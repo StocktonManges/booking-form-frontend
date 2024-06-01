@@ -1,10 +1,14 @@
-import { ChangeEventHandler, useRef, useState } from "react";
+import { ChangeEventHandler, useRef } from "react";
 import bsClasses from "../styling/bootstrap-classes";
+import { PhoneInputState } from "../types";
 
-type PhoneInputState = [string, string, string];
-
-export const PhoneInputs = () => {
-  const [phoneInput, setPhoneInput] = useState<PhoneInputState>(["", "", ""]);
+export const PhoneInputs = ({
+  phoneInput,
+  setPhoneInput,
+}: {
+  phoneInput: PhoneInputState;
+  setPhoneInput: React.Dispatch<React.SetStateAction<PhoneInputState>>;
+}) => {
   // The length of each string of numbers between hyphens.
   const phoneInputLengths = [3, 3, 4];
   const refs = [
